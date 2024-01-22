@@ -1,82 +1,8 @@
-/*
-import logo from './logo.svg';
-import './App.css';
-
-function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
-  );
-}
-
-export default App;
-*/
-/*
-import React from 'react';
-import logo from './logo.svg';
-import './App.css';
-
-function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <h1>Hello from V2</h1>
-      </header>
-    </div>
-  );
-}
-
-export default App;
-*/
-/*
-import logo from "./logo.svg";
-import "@aws-amplify/ui-react/styles.css";
-import {
-  withAuthenticator,
-  Button,
-  Heading,
-  Image,
-  View,
-  Card,
-} from "@aws-amplify/ui-react";
-
-function App({ signOut }) {
-  return (
-    <View className="App">
-      <Card>
-        <Image src={logo} className="App-logo" alt="logo" />
-        <Heading level={1}>We now have Auth!</Heading>
-      </Card>
-      <Button onClick={signOut}>Sign Out</Button>
-    </View>
-  );
-}
-
-export default withAuthenticator(App);
-*/
+// From: https://aws.amazon.com/getting-started/hands-on/build-react-app-amplify-graphql/module-two/?e=gs2020&p=build-a-react-app
 import React, { useState, useEffect } from "react";
 import "./App.css";
 import "@aws-amplify/ui-react/styles.css";
-import { generateClient } from 'aws-amplify/api';
-import { createTodo, updateTodo, deleteTodo } from './graphql/mutations';
-import { listTodos } from './graphql/queries';
-// import { API } from "aws-amplify";
-import { Storage } from "aws-amplify";
+import { uploadData, getUrl, remove } from 'aws-amplify/storage';
 import {
   Button,
   Flex,
@@ -93,6 +19,13 @@ import {
   deleteNote as deleteNoteMutation,
 } from "./graphql/mutations";
 
+// From ChatGPT:
+import {Amplify} from 'aws-amplify';
+import awsExports from './aws-exports'; // The path may vary
+import { generateClient } from 'aws-amplify/api';
+
+Amplify.configure(awsExports);
+
 const client = generateClient();
 
 const App = ({ signOut }) => {
@@ -108,10 +41,9 @@ const App = ({ signOut }) => {
     await Promise.all(
       notesFromAPI.map(async (note) => {
         if (note.image) {
-          const url = await Storage.get(note.name);
+          const url = await getUrl({key: note.id});
           note.image = url;
-        }
-        return note;
+        } return note;
       })
     );
     setNotes(notesFromAPI);
@@ -124,21 +56,21 @@ const App = ({ signOut }) => {
     const data = {
       name: form.get("name"),
       description: form.get("description"),
-      image: image.name,
+      image: image.name
     };
-    if (!!data.image) await Storage.put(data.name, image);
-    await client.graphql({
+    const result=await client.graphql({
       query: createNoteMutation,
       variables: { input: data },
     });
+    if (!!data.image) await uploadData({key:result.data.createNote.id, data:image}).result;
     fetchNotes();
     event.target.reset();
-  }
+  } 
 
   async function deleteNote({ id, name }) {
     const newNotes = notes.filter((note) => note.id !== id);
     setNotes(newNotes);
-    await Storage.remove(name);
+    await remove({key:id});
     await client.graphql({
       query: deleteNoteMutation,
       variables: { input: { id } },
@@ -149,7 +81,7 @@ const App = ({ signOut }) => {
     <View className="App">
       <Heading level={1}>My Notes App</Heading>
       <View as="form" margin="3rem 0" onSubmit={createNote}>
-        <Flex direction="row" justifyContent="center">
+    	<Flex direction="row" justifyContent="center">
           <TextField
             name="name"
             placeholder="Note Name"
@@ -180,28 +112,28 @@ const App = ({ signOut }) => {
       <Heading level={2}>Current Notes</Heading>
       <View margin="3rem 0">
         {notes.map((note) => (
-          <Flex
-            key={note.id || note.name}
-            direction="row"
-            justifyContent="center"
-            alignItems="center"
-          >
-            <Text as="strong" fontWeight={700}>
-              {note.name}
-            </Text>
-            <Text as="span">{note.description}</Text>
-            {note.image && (
-              <Image
-                src={note.image}
-                alt={`visual aid for ${notes.name}`}
-                style={{ width: 400 }}
-              />
-            )}
-            <Button variation="link" onClick={() => deleteNote(note)}>
-              Delete note
-            </Button>
-          </Flex>
-        ))}
+        <Flex
+          key={note.id || note.name}
+          direction="row"
+          justifyContent="center"
+          alignItems="center"
+        >
+    	  <Text as="strong" fontWeight={700}>
+            {note.name}
+          </Text>
+          <Text as="span">{note.description}</Text>
+          {note.image && (
+            <Image
+              src={note.image.url.href}
+              alt={`visual aid for ${note.name}`}
+              style={{ width: 400 }}
+            />
+          )}
+          <Button variation="link" onClick={() => deleteNote(note)}>
+            Delete note
+          </Button>
+        </Flex>
+      ))}
       </View>
       <Button onClick={signOut}>Sign Out</Button>
     </View>
